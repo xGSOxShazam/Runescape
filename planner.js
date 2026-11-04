@@ -102,7 +102,7 @@ function money(n){return n===null?'Unavailable':(n>=0?'+':'−')+gp(Math.abs(n))
 function routeMarkup(route,from,to){
  const saved=savedProgress(),id=from+'-'+to+'-'+route.kind;
  const stages=route.stages.map((s,i)=>{
-  const key=id+'-'+i,done=!!saved[key];
+  const key=id+'-'+s.start+'-'+s.end+'-'+s.method.name,done=!!saved[key];
   return '<article class="plan-stage'+(done?' stage-done':'')+'"><div class="plan-stage-level">LEVEL '+s.start+' → '+s.end+'</div><div class="plan-stage-main"><strong>'+escape(s.method.name)+'</strong><span>'+nf.format(s.count)+' to make</span></div>'+
   '<p>'+nf.format(s.xp)+' XP to earn · '+s.hours.toFixed(1)+' estimated hours · '+(s.net===null?'GE margin unavailable':money(s.net)+' net GP')+'</p>'+
   '<details><summary>Shopping list & breakdown</summary><ul>'+s.items.map(item=>'<li>'+nf.format(item.qty)+' × '+escape(item.name)+'</li>').join('')+'</ul><p>Purchase cost: '+(s.buy===null?'Unavailable':gp(s.buy))+' · Sale revenue after estimated GE tax: '+(s.revenue===null?'Unavailable':gp(s.revenue))+'</p><p><a href="'+escape(s.method.source)+'" target="_blank" rel="noopener">Method reference ↗</a></p></details>'+
@@ -128,10 +128,24 @@ function drawPlan(){
  '<div class="plan-controls"><button type="button" id="plan-recalculate" class="button button-outline">Recalculate remaining XP</button></div>'+
  '<p class="plan-disclaimer">Training speeds, workbench recipes and yields are provisional assumptions, not verified purchase instructions. GE quotes are indicative. The Best Overall route uses a 3m GP/hour time-value assumption. DXP eligibility varies by activity. Progress is saved only in this browser.</p>';
 }
+function skillGuidePlan(from,to,xp){
+ const entry=(window.CODEX_SKILLS||[]).find(s=>s.id===activeSkill);
+ const needed=xpAt(to)-xp;
+ const steps=[from,...[10,20,30,40,50,60,70,80,90,99,100,110].filter(n=>n>from&&n<to),to];
+ const tiers=entry?.tiers||{};
+ const equip=level=>level<60?'low':level<90?'medium':'high';
+ const stages=steps.slice(0,-1).map((level,i)=>{
+  const end=steps[i+1],tier=equip(level);
+  const items=(tiers[tier]||[]).map(v=>'<li>'+escape(v)+'</li>').join('');
+  return '<article class="plan-stage"><div class="plan-stage-level">LEVEL '+level+' → '+end+'</div><div class="plan-stage-main"><strong>'+escape(entry?.name||activeSkill)+' training milestone</strong><span>'+nf.format(xpAt(end)-(i===0?xp:xpAt(level)))+' XP</span></div><p>Suggested '+tier+'-tier setup from the skill guide:</p><ul>'+items+'</ul></article>';
+ }).join('');
+ results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+'</span></div><p class="plan-warning">A detailed training-method database is not yet available for '+escape(entry?.name||activeSkill)+'. This is an XP milestone and equipment guide, not a verified fastest or profitable route. No invented GP or XP/hour estimates are shown.</p><div class="plan-roadmap"><h3>Level milestones and recommended setup</h3>'+stages+'</div><p class="plan-disclaimer">See the research guide below for training methods and unlock requirements. Equipment tiers are general recommendations, not guaranteed level-specific unlocks.</p>';
+ setStatus('Showing XP milestones and existing equipment research for '+(entry?.name||activeSkill)+'.');
+}
 function compute(){
  const from=Number(current.value),to=Number(goal.value),raw=currentXp.value.trim();
  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to>120||to<=from){setStatus('Choose a current level and a higher goal between 1 and 120.');results.innerHTML='';return;}
- if(activeSkill!=='fletching'){setStatus('Training calculations are currently available for Fletching only.');results.innerHTML='';return;}
+ if(activeSkill!=='fletching'){const rawXp=currentXp.value.trim(),actualXp=rawXp===''?xpAt(from):Number(rawXp.replace(/,/g,''));if(!Number.isFinite(actualXp)||actualXp<xpAt(from)||actualXp>=xpAt(from+1)){setStatus('Enter valid XP for your current level.');results.innerHTML='';return;}skillGuidePlan(from,to,actualXp);return;}
  const xp=raw===''?xpAt(from):Number(raw.replace(/,/g,''));
  if(!Number.isFinite(xp)||xp<xpAt(from)||xp>=xpAt(from+1)){setStatus('Current XP must fall within your selected level.');results.innerHTML='';return;}
  const multiplier=dxp.checked?2:1;
@@ -140,7 +154,7 @@ function compute(){
  drawPlan();
  setStatus('Live GE quotes checked '+new Date(priceUpdated).toLocaleTimeString()+'. Routes compare entire journeys, not isolated methods.');
 }
-document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch(e){setStatus('GE quotes could not be loaded. Check your connection and try again.');}});
+document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';if(activeSkill!=='fletching'){compute();return;}setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch(e){setStatus('GE quotes could not be loaded. Check your connection and try again.');}});
 results.addEventListener('click',e=>{
  const route=e.target.closest('[data-route]');if(route){selected=route.dataset.route;drawPlan();return;}
  if(e.target.closest('#plan-recalculate')){lastPlan=null;document.getElementById('plan-form').requestSubmit();}
