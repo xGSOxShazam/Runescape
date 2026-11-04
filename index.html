@@ -14,17 +14,19 @@
   <script src="./skills-data.js" defer></script>
   <script src="./app.js" defer></script>
   <script src="./planner.js" defer></script>
+  <script src="./player.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#library">Skip to skill library</a>
   <div class="ambient" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="#" aria-label="The Grand Codex home"><span class="brand-sigil" aria-hidden="true">ᛟ</span><span>THE GRAND <strong>CODEX</strong><small>A RUNESCAPE 3 FIELD GUIDE</small></span></a>
-    <nav aria-label="Main navigation"><a class="nav-link active" href="#library">Skill library</a><a class="nav-link" href="#toolkit">XP toolkit</a><a class="nav-link" href="#field-notes">Field notes <span class="nav-dot"></span></a></nav>
+    <nav aria-label="Main navigation"><a class="nav-link" href="#player-dashboard">My player</a><a class="nav-link active" href="#library">Skill library</a><a class="nav-link" href="#toolkit">XP toolkit</a><a class="nav-link" href="#field-notes">Field notes <span class="nav-dot"></span></a></nav>
     <button class="button button-small button-outline saved-nav" id="saved-nav"><span data-icon="bookmark"></span> My collection <span id="saved-count">0</span></button>
   </header>
 
   <main>
+    <section class="wrap section-space player-section" id="player-dashboard" aria-labelledby="player-dashboard-title"><div class="section-heading"><div><div class="eyebrow">YOUR ADVENTURER</div><h2 id="player-dashboard-title">Plan with your own stats<span>.</span></h2><p>Enter your RS3 character name, set goals, and jump straight into a training route.</p></div></div><div class="player-panel"><form id="codex-player-form" class="player-form"><label for="codex-player-name">RuneScape character name</label><div class="player-form-row"><input id="codex-player-name" maxlength="12" autocomplete="off" placeholder="Your RS3 name" required><button type="submit" class="button button-gold">Find my stats ↗</button><button id="codex-player-clear" class="button button-outline" type="button" hidden>Clear</button></div></form><p id="codex-player-message" role="status">Public Hiscores lookup requires no account password. If browser restrictions prevent loading, use the manual skill planner.</p><p id="codex-player-summary" class="player-summary"></p><div id="codex-player-skills" class="player-grid"></div><p class="plan-disclaimer">Public Hiscores may omit unranked skills. Profile snapshots and goals stay in this browser. This site never asks for your RuneScape password.</p></div></section>
     <section class="hero wrap" aria-labelledby="hero-title">
       <div class="hero-copy">
         <div class="eyebrow"><span class="tiny-star">✦</span> FOR THE JOURNEY BEYOND 99</div>
