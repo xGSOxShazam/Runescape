@@ -13,13 +13,14 @@
   <link rel="stylesheet" href="./styles.css">
   <script src="./skills-data.js" defer></script>
   <script src="./app.js" defer></script>
+  <script src="./planner.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#library">Skip to skill library</a>
   <div class="ambient" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="#" aria-label="The Grand Codex home"><span class="brand-sigil" aria-hidden="true">ᛟ</span><span>THE GRAND <strong>CODEX</strong><small>A RUNESCAPE 3 FIELD GUIDE</small></span></a>
-    <nav aria-label="Main navigation"><a class="nav-link active" href="#library">Skill library</a><a class="nav-link" href="#toolkit">XP toolkit</a><a class="nav-link" href="#field-notes">Field notes <span class="nav-dot"></span></a></nav>
+    <nav aria-label="Main navigation"><a class="nav-link active" href="#library">Skill library</a><a class="nav-link" href="#planner">Training planner</a><a class="nav-link" href="#toolkit">XP toolkit</a><a class="nav-link" href="#field-notes">Field notes <span class="nav-dot"></span></a></nav>
     <button class="button button-small button-outline saved-nav" id="saved-nav"><span data-icon="bookmark"></span> My collection <span id="saved-count">0</span></button>
   </header>
 
@@ -59,6 +60,7 @@
       <div class="library-footnote"><span>✦</span><p><strong>Build for your method.</strong> “Best in slot” is conditional: level requirements, training method and attention all matter. High tiers include upgrades beyond 99; check the full guide before buying.</p></div>
     </section>
 
+    <section class="wrap section-space planner-section" id="planner" aria-labelledby="planner-title"><div class="section-heading"><div><div class="eyebrow">YOUR NEXT MILESTONE</div><h2 id="planner-title">Skill training planner<span>.</span></h2><p>Three paths to your goal. Live Grand Exchange prices and an exact material shopping list.</p></div></div><form id="plan-form" class="planner-form"><label>Skill<select id="plan-skill"></select></label><label>Current level<input id="plan-current" type="number" min="1" max="119" value="99" required></label><label>Goal level<input id="plan-goal" type="number" min="2" max="120" value="110" required></label><label>Current total XP (optional)<input id="plan-current-xp" inputmode="numeric" placeholder="Starts at current level's minimum XP"></label><label class="plan-check"><input id="plan-dxp" type="checkbox"> Double XP scenario</label><button class="button button-gold" type="submit">Calculate all three plans ↗</button><button id="plan-refresh" class="button button-outline" type="button">Refresh prices</button></form><p id="plan-status" class="plan-status" role="status">Enter your levels to compare training methods.</p><div id="plan-results" aria-live="polite"></div><p class="plan-disclaimer">Training rates are estimates and may differ after game updates. The planner currently has verified recipe data for Fletching; other skills will be added as their methods are validated. A future unlock is not counted as available at your starting level. XP boosts other than the simple Double XP scenario are not included.</p></section>
     <section class="toolkit-section section-space" id="toolkit" aria-labelledby="toolkit-title"><div class="wrap"><div class="section-heading"><div><div class="eyebrow">SMALL ADVANTAGES. LONG JOURNEYS.</div><h2 id="toolkit-title">Your everyday XP toolkit<span>.</span></h2><p>The essentials worth checking before you start.</p></div><span class="section-ornament" aria-hidden="true">✧</span></div>
       <div class="toolkit-grid">
         <article class="tool-card"><span class="tool-number">I</span><span class="tool-icon" data-icon="robe"></span><h3>Dress for the skill</h3><div class="tool-value">5–6<span>% XP</span></div><p>Most full XP outfits give 5–6%. Elite sets often inherit an owned basic set’s bonus; they don’t add a second full bonus.</p><a href="https://runescape.wiki/w/Experience-boosting_sets" target="_blank" rel="noopener">Explore XP outfits <span>↗</span></a></article>
