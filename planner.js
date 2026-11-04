@@ -47,63 +47,110 @@ function card(label,item,description){
  const outcome=item.profit===null?'Price unavailable':item.profit>=0?'+'+gp(item.profit):'−'+gp(-item.profit);
  return '<article class="plan-card"><div class="plan-card-kicker">'+escape(label)+'</div><h3>'+escape(item.name)+'</h3><p>'+escape(description)+'</p><div class="plan-metrics"><div><small>MAKE</small><strong>'+nf.format(item.count)+'</strong></div><div><small>TIME EST.</small><strong>'+item.hours.toFixed(1)+'h</strong></div><div><small>NET GP EST.</small><strong>'+outcome+'</strong></div></div><h4>Shopping list</h4><ul>'+rows+'</ul><p class="plan-small">Base '+nf.format(item.xp)+' XP per item · '+nf.format(item.rate)+' items/hour assumed · GE sale includes estimated 2% tax. '+(item.missing.length?'Missing or stale prices: '+escape(item.missing.join(', '))+'. ':'')+'<a href="'+item.source+'" target="_blank" rel="noopener">Method reference ↗</a></p></article>';
 }
-function stageCard(start,end,method,amount,materials,comment){
- return '<div class="plan-stage"><div class="plan-stage-level">LEVEL '+start+' → '+end+'</div><div class="plan-stage-main"><strong>'+escape(method)+'</strong><span>'+nf.format(amount)+' to make</span></div><p>'+escape(materials)+'</p><small>'+escape(comment)+'</small></div>';
+
+// Routes are assembled independently for each level segment, rather than ranking partial routes.
+const routeChoices=[
+ {id:'fast',label:'FASTEST',title:'Fastest XP',explain:'Prioritizes XP per hour, even if supplies cost more.'},
+ {id:'balanced',label:'BEST OVERALL',title:'Best Overall',explain:'Balances speed and GP cost. Penalizes very expensive XP.'},
+ {id:'profit',label:'MOST PROFITABLE',title:'Most Profitable',explain:'Prioritizes estimated profit; only claims profit when priced.'}
+];
+let selected='balanced',lastPlan=null;
+const progressKey='grand-codex-fletching-progress-v2';
+function savedProgress(){try{return JSON.parse(localStorage.getItem(progressKey)||'{}')}catch{return {}}}
+function methodList(level,multiplier){
+ const list=recipes.filter(r=>r.level<=level).map(r=>({...r,kind:'recipe',per:r.xp*multiplier,perHour:r.rate*r.xp*multiplier}));
+ // Mk. 5 workbench data are preliminary. Never substitute a bow with an unverified GE quote silently.
+ if(level>=100)list.push({name:'Eternal magic shortbow Mk. 5',level:100,xp:52840,per:52840*multiplier,rate:3600/912,perHour:52840*multiplier*3600/912,kind:'workbench',base:'Eternal magic shortbow',output:'Eternal magic shortbow Mk. 5',logs:63,source:'https://runescape.wiki/w/Fletching'});
+ if(level>=103)list.push({name:'Primal crossbow Mk. 5',level:103,xp:65235,per:65235*multiplier,rate:3600/1091.4,perHour:65235*multiplier*3600/1091.4,kind:'workbench',base:'Primal crossbow',output:'Primal crossbow Mk. 5',logs:63,source:'https://runescape.wiki/w/Fletching'});
+ return list;
 }
-function buildRoadmap(from,to,xp,multiplier,kind){
- const breaks=[from,...[100,103].filter(n=>n>from&&n<to),to];
- let html='<section class="plan-roadmap"><div class="plan-card-kicker">'+escape(kind)+' · LEVEL-BY-LEVEL ROUTE</div><h3>What to make, and when to switch</h3>';
- let total=0;
- for(let i=0;i<breaks.length-1;i++){
-  const a=breaks[i],b=breaks[i+1],segmentXp=xpAt(b)-(i===0?xp:xpAt(a));
-  let method,amount,materials,comment;
-  if(kind==='FASTEST'||a<100){
-   const r=recipes.find(x=>x.name==='Dragon darts');
-   amount=Math.ceil(segmentXp/(r.xp*multiplier));method='Dragon darts';materials=nf.format(amount)+' dragon dart tips + '+nf.format(amount)+' feathers';comment='Available from level 95. High-volume option; compare actual costs.';
-  }else{
-   const primal=a>=103;
-   const per=primal?65235:52840;
-   amount=Math.ceil(segmentXp/(per*multiplier));
-   method=primal?'Primal crossbow Mk. 5':'Eternal magic shortbow Mk. 5';
-   materials=nf.format(amount)+' base bows + approximately '+nf.format(amount*63)+' eternal magic logs';
-   comment='Workbench upgrade route. Check current recipe, unlock and actual output before buying supplies; figures are preliminary estimates.';
-  }
-  total+=amount;
-  html+=stageCard(a,b,method,amount,materials,comment);
+function stageEstimate(m,xpNeeded){
+ const count=Math.ceil(xpNeeded/m.per),hours=count/m.rate;
+ let items=m.kind==='recipe'?Object.entries(m.inputs).map(([name,qty])=>({name,qty:qty*count})):
+ [{name:m.base,qty:count},{name:'Eternal magic logs',qty:count*m.logs}];
+ let buy=0,unknown=[];
+ for(const item of items){const quote=price(item.name,'buy');if(quote===null)unknown.push(item.name);else buy+=quote*item.qty;}
+ const output=m.output,sale=price(output,'sell');
+ if(sale===null)unknown.push(output);
+ const revenue=sale===null?null:sale*count*(m.units||1)*.98;
+ return {method:m,count,hours,items,buy:unknown.length?null:buy,revenue:unknown.length?null:revenue,net:unknown.length?null:revenue-buy,unknown};
+}
+function chooseStage(level,xpNeeded,kind,multiplier){
+ const choices=methodList(level,multiplier).map(m=>stageEstimate(m,xpNeeded));
+ if(kind==='fast')return choices.sort((a,b)=>a.hours-b.hours)[0];
+ if(kind==='profit'){
+  const known=choices.filter(x=>x.net!==null);
+  return known.length?known.sort((a,b)=>b.net-a.net)[0]:choices.sort((a,b)=>a.hours-b.hours)[0];
  }
- html+='</section>';return html;
+ // A profitable route is favored, but a much slower route must earn its extra time.
+ // 3m GP per extra hour is a configurable opportunity-cost assumption, not a market fact.
+ const known=choices.filter(x=>x.net!==null);
+ return known.length?known.sort((a,b)=>(b.net-3000000*b.hours)-(a.net-3000000*a.hours))[0]:choices.sort((a,b)=>a.hours-b.hours)[0];
+}
+function buildRoute(from,to,xp,multiplier,kind){
+ const boundaries=[from,...[100,103].filter(n=>n>from&&n<to),to];
+ const stages=[];
+ for(let i=0;i<boundaries.length-1;i++){
+  const start=boundaries[i],end=boundaries[i+1];
+  const amount=xpAt(end)-(i===0?xp:xpAt(start));
+  stages.push({start,end,xp:amount,...chooseStage(start,amount,kind,multiplier)});
+ }
+ const known=stages.every(s=>s.net!==null);
+ return {kind,stages,hours:stages.reduce((n,s)=>n+s.hours,0),buy:known?stages.reduce((n,s)=>n+s.buy,0):null,revenue:known?stages.reduce((n,s)=>n+s.revenue,0):null,net:known?stages.reduce((n,s)=>n+s.net,0):null,unknown:[...new Set(stages.flatMap(s=>s.unknown))]};
+}
+function money(n){return n===null?'Unavailable':(n>=0?'+':'−')+gp(Math.abs(n))}
+function routeMarkup(route,from,to){
+ const saved=savedProgress(),id=from+'-'+to+'-'+route.kind;
+ const stages=route.stages.map((s,i)=>{
+  const key=id+'-'+i,done=!!saved[key];
+  return '<article class="plan-stage'+(done?' stage-done':'')+'"><div class="plan-stage-level">LEVEL '+s.start+' → '+s.end+'</div><div class="plan-stage-main"><strong>'+escape(s.method.name)+'</strong><span>'+nf.format(s.count)+' to make</span></div>'+
+  '<p>'+nf.format(s.xp)+' XP to earn · '+s.hours.toFixed(1)+' estimated hours · '+(s.net===null?'GE margin unavailable':money(s.net)+' net GP')+'</p>'+
+  '<details><summary>Shopping list & breakdown</summary><ul>'+s.items.map(item=>'<li>'+nf.format(item.qty)+' × '+escape(item.name)+'</li>').join('')+'</ul><p>Purchase cost: '+(s.buy===null?'Unavailable':gp(s.buy))+' · Sale revenue after estimated GE tax: '+(s.revenue===null?'Unavailable':gp(s.revenue))+'</p><p><a href="'+escape(s.method.source)+'" target="_blank" rel="noopener">Method reference ↗</a></p></details>'+
+  '<label class="plan-done"><input type="checkbox" data-stage="'+escape(key)+'" '+(done?'checked':'')+'> Mark stage complete</label></article>';
+ }).join('');
+ return '<div class="plan-roadmap"><h3>When to switch methods</h3>'+stages+'</div>';
+}
+function summaryMarkup(route){
+ return '<div class="plan-totals"><div><small>TIME</small><strong>'+route.hours.toFixed(1)+'h</strong></div><div><small>SUPPLIES</small><strong>'+(route.buy===null?'Price missing':gp(route.buy))+'</strong></div><div><small>RESALE</small><strong>'+(route.revenue===null?'Price missing':gp(route.revenue))+'</strong></div><div><small>NET GP</small><strong>'+money(route.net)+'</strong></div></div>';
+}
+function drawPlan(){
+ if(!lastPlan)return;
+ const {from,to,xp,multiplier,routes}=lastPlan;
+ const route=routes.find(r=>r.kind===selected);
+ const fastest=routes.find(r=>r.kind==='fast');
+ const difference=route.hours-fastest.hours;
+ const trade=selected==='fast'?'This route prioritizes time over GP.':route.net!==null&&fastest.net!==null?
+  'Compared with Fastest: '+(difference>=0?difference.toFixed(1)+' more hours':Math.abs(difference).toFixed(1)+' fewer hours')+' and '+money(route.net-fastest.net)+' additional net GP.':'GP comparison unavailable until all items have current quotes.';
+ const missing=route.unknown.length?'<p class="plan-warning">Missing or stale GE prices: '+escape(route.unknown.join(', '))+'. Profit and cost totals are intentionally hidden.</p>':'';
+ results.innerHTML='<div class="plan-summary"><strong>'+nf.format(xpAt(to)-xp)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(multiplier===2?'Double XP scenario':'Base XP')+'</span></div>'+
+ '<div class="plan-strategies" role="group" aria-label="Training strategy">'+routeChoices.map(r=>'<button type="button" data-route="'+r.id+'" class="'+(r.id===selected?'is-active':'')+'">'+r.title+'</button>').join('')+'</div>'+
+ '<p class="plan-strategy-info">'+escape(routeChoices.find(r=>r.id===selected).explain)+'</p>'+summaryMarkup(route)+'<p class="plan-tradeoff">'+escape(trade)+'</p>'+routeMarkup(route,from,to)+missing+
+ '<div class="plan-controls"><button type="button" id="plan-recalculate" class="button button-outline">Recalculate remaining XP</button></div>'+
+ '<p class="plan-disclaimer">Training speeds, workbench recipes and yields are provisional assumptions, not verified purchase instructions. GE quotes are indicative. The Best Overall route uses a 3m GP/hour time-value assumption. DXP eligibility varies by activity. Progress is saved only in this browser.</p>';
 }
 function compute(){
  const from=Number(current.value),to=Number(goal.value),raw=currentXp.value.trim();
  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to>120||to<=from){setStatus('Choose a current level and a higher goal between 1 and 120.');results.innerHTML='';return;}
- if(activeSkill!=='fletching'){setStatus('Live method calculations are currently available for Fletching. Other skill plans are being researched; no made-up XP or GP estimates will be shown.');results.innerHTML='';return;}
+ if(activeSkill!=='fletching'){setStatus('Training calculations are currently available for Fletching only.');results.innerHTML='';return;}
  const xp=raw===''?xpAt(from):Number(raw.replace(/,/g,''));
- if(!Number.isFinite(xp)||xp<xpAt(from)||xp>=xpAt(from+1)){setStatus('Current XP must fall within your selected current level. Clear the XP field to start at the beginning of the level.');results.innerHTML='';return;}
- const needed=Math.max(0,xpAt(to)-xp),multiplier=dxp.checked?2:1;
- const eligible=recipes.filter(r=>r.level<=from).map(r=>calculate(r,needed,multiplier));
- // Workbench methods unlocked during the journey are calculated for their eligible XP segment.
- function workbench(name,unlock,xpPerBow,seconds,finished){
-  if(to<=unlock)return null;
-  const stageXp=Math.max(0,xpAt(to)-Math.max(xp,xpAt(unlock)));
-  const count=Math.ceil(stageXp/(xpPerBow*multiplier)),logs=count*63;
-  const logCost=price('Eternal magic logs','buy'),bowCost=price(name,'buy'),sale=price(finished,'sell');
-  const missing=[logCost===null?'Eternal magic logs':null,bowCost===null?name:null,sale===null?finished:null].filter(Boolean);
-  const cost=logCost===null||bowCost===null?null:logs*logCost+count*bowCost;
-  return {name:finished+' (sell Mk. 5)',level:unlock,xp:xpPerBow,rate:3600/seconds,count,hours:count*seconds/3600,ingredients:[{name,qty:count},{name:'Eternal magic logs',qty:logs}],cost,profit:cost===null||sale===null?null:count*sale*.98-cost,missing,source:'https://runescape.wiki/w/Fletching',note:'Unlocks at level '+unlock+'. These quantities cover only the XP from level '+unlock+' onward; earlier levels need a separate method.'};
- }
- const options=[...eligible,
-  workbench('Eternal magic shortbow',100,52840,912,'Eternal magic shortbow Mk. 5'),
-  workbench('Primal crossbow',103,65235,1091.4,'Primal crossbow Mk. 5')
- ].filter(Boolean);
- if(!eligible.length){setStatus('No verified Fletching recipes are available at this starting level.');results.innerHTML='';return;}
- const fastest=[...options].sort((a,b)=>a.hours-b.hours)[0];
- const best=[...options].filter(x=>x.profit!==null).sort((a,b)=>b.profit/b.hours-a.profit/a.hours)[0] || fastest;
- const profitable=[...options].filter(x=>x.profit!==null&&x.profit>0).sort((a,b)=>b.profit-a.profit)[0];
- results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(dxp.checked?'2× base XP scenario':'Base XP, no bonuses')+'</span></div><div class="plan-cards">'+card('⚡ FASTEST',fastest,'Prioritizes training speed, regardless of cost.')+card('⚖ BEST VALUE',best,'Balances training with estimated GP return per hour; later unlocks apply only to their eligible level ranges.')+(profitable?card('💰 PROFITABLE',profitable,'Positive estimated GP after the GE sale tax, subject to changing prices.'):'<article class="plan-card"><div class="plan-card-kicker">💰 PROFITABLE</div><h3>No confirmed profit method</h3><p>None of the modeled, unlocked recipes has a verified positive margin at the latest available prices. We will not invent a profitable option.</p></article>')+'</div>'+buildRoadmap(from,to,xp,multiplier,'FASTEST')+buildRoadmap(from,to,xp,multiplier,'BEST VALUE / PROFIT') ;
- setStatus('Prices fetched automatically from RuneScape Wiki real-time GE trades. Prices are indicative, not guaranteed. Later unlocks cover only their eligible XP range; earlier levels still need training. Last fetched: '+new Date(priceUpdated).toLocaleTimeString()+'.');
+ if(!Number.isFinite(xp)||xp<xpAt(from)||xp>=xpAt(from+1)){setStatus('Current XP must fall within your selected level.');results.innerHTML='';return;}
+ const multiplier=dxp.checked?2:1;
+ const routes=routeChoices.map(r=>buildRoute(from,to,xp,multiplier,r.id));
+ lastPlan={from,to,xp,multiplier,routes};
+ drawPlan();
+ setStatus('Live GE quotes checked '+new Date(priceUpdated).toLocaleTimeString()+'. Routes compare entire journeys, not isolated methods.');
 }
-document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch{setStatus('Live GE prices could not be loaded. Try again later. No unverified GP estimates will be displayed.');}});
-document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;results.innerHTML='';currentXp.value='';setStatus(activeSkill==='fletching'?'Enter your Fletching levels, then calculate all three plans.':'Training calculations for '+e.detail.name+' are being researched. This skill’s equipment guide remains available below.');});
+document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch(e){setStatus('GE quotes could not be loaded. Check your connection and try again.');}});
+results.addEventListener('click',e=>{
+ const route=e.target.closest('[data-route]');if(route){selected=route.dataset.route;drawPlan();return;}
+ if(e.target.closest('#plan-recalculate')){lastPlan=null;document.getElementById('plan-form').requestSubmit();}
+});
+results.addEventListener('change',e=>{
+ const input=e.target.closest('[data-stage]');if(!input)return;
+ const saved=savedProgress();saved[input.dataset.stage]=input.checked;
+ try{localStorage.setItem(progressKey,JSON.stringify(saved))}catch{}
+ input.closest('.plan-stage')?.classList.toggle('stage-done',input.checked);
+});
+document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;lastPlan=null;results.innerHTML='';currentXp.value='';setStatus(activeSkill==='fletching'?'Enter your Fletching levels to compare complete routes.':'Verified route calculations are not yet available for '+e.detail.name+'.');});
 document.getElementById('plan-refresh').addEventListener('click',()=>{priceMap=null;prices=null;document.getElementById('plan-form').requestSubmit();});
-
 })();
