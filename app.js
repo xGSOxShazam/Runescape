@@ -107,7 +107,8 @@
     const skill=skills.find(s=>s.id===id);if(!skill)return;
     if(!dialog.open)previousFocus=document.activeElement;
     activeSkill=skill;
-    dialog.style.setProperty('--skill-color',colours[skill.category]);
+    dialog.style.setProperty('--skill-color',skillPalette[skill.id] || colours[skill.category]);
+    document.dispatchEvent(new CustomEvent('codex:skill-open',{detail:{id:skill.id,name:skill.name}}));
     document.getElementById('dialog-category').textContent=`${skill.category==='Support'?'SUPPORT & ELITE':skill.category.toUpperCase()} / SKILL FIELD GUIDE`;
     document.getElementById('dialog-title').textContent=skill.name;
     document.getElementById('dialog-summary').textContent=skill.summary;
