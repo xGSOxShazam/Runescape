@@ -1,7 +1,8 @@
 (() => {
 'use strict';
 const root=document.getElementById('training-planner');if(!root)return;
-const skill=document.getElementById('plan-skill'),current=document.getElementById('plan-current'),goal=document.getElementById('plan-goal'),currentXp=document.getElementById('plan-current-xp'),dxp=document.getElementById('plan-dxp'),results=document.getElementById('plan-results'),status=document.getElementById('plan-status');
+let activeSkill='fletching';
+const current=document.getElementById('plan-current'),goal=document.getElementById('plan-goal'),currentXp=document.getElementById('plan-current-xp'),dxp=document.getElementById('plan-dxp'),results=document.getElementById('plan-results'),status=document.getElementById('plan-status');
 const nf=new Intl.NumberFormat('en-US');const gp=n=>nf.format(Math.round(n))+' GP';
 const recipes=[
  {name:'Dragon darts',level:95,xp:25,rate:60000,inputs:{'Dragon dart tip':1,'Feather':1},output:'Dragon dart',units:1,source:'https://runescape.wiki/w/Pay-to-play_Fletching_training'},
@@ -46,11 +47,10 @@ function card(label,item,description){
  const outcome=item.profit===null?'Price unavailable':item.profit>=0?'+'+gp(item.profit):'−'+gp(-item.profit);
  return '<article class="plan-card"><div class="plan-card-kicker">'+escape(label)+'</div><h3>'+escape(item.name)+'</h3><p>'+escape(description)+'</p><div class="plan-metrics"><div><small>MAKE</small><strong>'+nf.format(item.count)+'</strong></div><div><small>TIME EST.</small><strong>'+item.hours.toFixed(1)+'h</strong></div><div><small>NET GP EST.</small><strong>'+outcome+'</strong></div></div><h4>Shopping list</h4><ul>'+rows+'</ul><p class="plan-small">Base '+nf.format(item.xp)+' XP per item · '+nf.format(item.rate)+' items/hour assumed · GE sale includes estimated 2% tax. '+(item.missing.length?'Missing or stale prices: '+escape(item.missing.join(', '))+'. ':'')+'<a href="'+item.source+'" target="_blank" rel="noopener">Method reference ↗</a></p></article>';
 }
-function fillSkills(){const all=window.CODEX_SKILLS||[];skill.innerHTML=all.map(s=>'<option value="'+escape(s.id)+'">'+escape(s.name)+'</option>').join('');skill.value='fletching';}
 function compute(){
  const from=Number(current.value),to=Number(goal.value),raw=currentXp.value.trim();
  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to>120||to<=from){setStatus('Choose a current level and a higher goal between 1 and 120.');results.innerHTML='';return;}
- if(skill.value!=='fletching'){setStatus('Live method calculations are currently available for Fletching. Other skill plans are being researched; no made-up XP or GP estimates will be shown.');results.innerHTML='';return;}
+ if(activeSkill!=='fletching'){setStatus('Live method calculations are currently available for Fletching. Other skill plans are being researched; no made-up XP or GP estimates will be shown.');results.innerHTML='';return;}
  const xp=raw===''?xpAt(from):Number(raw.replace(/,/g,''));
  if(!Number.isFinite(xp)||xp<xpAt(from)||xp>=xpAt(from+1)){setStatus('Current XP must fall within your selected current level. Clear the XP field to start at the beginning of the level.');results.innerHTML='';return;}
  const needed=Math.max(0,xpAt(to)-xp),multiplier=dxp.checked?2:1;
@@ -63,7 +63,7 @@ function compute(){
  setStatus('Prices fetched automatically from RuneScape Wiki real-time GE trades. Prices are indicative, not guaranteed. Only methods unlocked at your starting level are compared. Last fetched: '+new Date(priceUpdated).toLocaleTimeString()+'.');
 }
 document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch{setStatus('Live GE prices could not be loaded. Try again later. No unverified GP estimates will be displayed.');}});
-skill.addEventListener('change',()=>{results.innerHTML='';setStatus(skill.value==='fletching'?'Ready to calculate Fletching.':'This skill is not yet covered by verified method data.');});
+document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;results.innerHTML='';currentXp.value='';setStatus(activeSkill==='fletching'?'Enter your Fletching levels, then calculate all three plans.':'Training calculations for '+e.detail.name+' are being researched. This skill’s equipment guide remains available below.');});
 document.getElementById('plan-refresh').addEventListener('click',()=>{priceMap=null;prices=null;document.getElementById('plan-form').requestSubmit();});
-fillSkills();
+
 })();
