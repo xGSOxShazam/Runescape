@@ -47,6 +47,32 @@ function card(label,item,description){
  const outcome=item.profit===null?'Price unavailable':item.profit>=0?'+'+gp(item.profit):'−'+gp(-item.profit);
  return '<article class="plan-card"><div class="plan-card-kicker">'+escape(label)+'</div><h3>'+escape(item.name)+'</h3><p>'+escape(description)+'</p><div class="plan-metrics"><div><small>MAKE</small><strong>'+nf.format(item.count)+'</strong></div><div><small>TIME EST.</small><strong>'+item.hours.toFixed(1)+'h</strong></div><div><small>NET GP EST.</small><strong>'+outcome+'</strong></div></div><h4>Shopping list</h4><ul>'+rows+'</ul><p class="plan-small">Base '+nf.format(item.xp)+' XP per item · '+nf.format(item.rate)+' items/hour assumed · GE sale includes estimated 2% tax. '+(item.missing.length?'Missing or stale prices: '+escape(item.missing.join(', '))+'. ':'')+'<a href="'+item.source+'" target="_blank" rel="noopener">Method reference ↗</a></p></article>';
 }
+function stageCard(start,end,method,amount,materials,comment){
+ return '<div class="plan-stage"><div class="plan-stage-level">LEVEL '+start+' → '+end+'</div><div class="plan-stage-main"><strong>'+escape(method)+'</strong><span>'+nf.format(amount)+' to make</span></div><p>'+escape(materials)+'</p><small>'+escape(comment)+'</small></div>';
+}
+function buildRoadmap(from,to,xp,multiplier,kind){
+ const breaks=[from,...[100,103].filter(n=>n>from&&n<to),to];
+ let html='<section class="plan-roadmap"><div class="plan-card-kicker">'+escape(kind)+' · LEVEL-BY-LEVEL ROUTE</div><h3>What to make, and when to switch</h3>';
+ let total=0;
+ for(let i=0;i<breaks.length-1;i++){
+  const a=breaks[i],b=breaks[i+1],segmentXp=xpAt(b)-(i===0?xp:xpAt(a));
+  let method,amount,materials,comment;
+  if(kind==='FASTEST'||a<100){
+   const r=recipes.find(x=>x.name==='Dragon darts');
+   amount=Math.ceil(segmentXp/(r.xp*multiplier));method='Dragon darts';materials=nf.format(amount)+' dragon dart tips + '+nf.format(amount)+' feathers';comment='Available from level 95. High-volume option; compare actual costs.';
+  }else{
+   const primal=a>=103;
+   const per=primal?65235:52840;
+   amount=Math.ceil(segmentXp/(per*multiplier));
+   method=primal?'Primal crossbow Mk. 5':'Eternal magic shortbow Mk. 5';
+   materials=nf.format(amount)+' base bows + approximately '+nf.format(amount*63)+' eternal magic logs';
+   comment='Workbench upgrade route. Check current recipe, unlock and actual output before buying supplies; figures are preliminary estimates.';
+  }
+  total+=amount;
+  html+=stageCard(a,b,method,amount,materials,comment);
+ }
+ html+='</section>';return html;
+}
 function compute(){
  const from=Number(current.value),to=Number(goal.value),raw=currentXp.value.trim();
  if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to>120||to<=from){setStatus('Choose a current level and a higher goal between 1 and 120.');results.innerHTML='';return;}
@@ -73,7 +99,7 @@ function compute(){
  const fastest=[...options].sort((a,b)=>a.hours-b.hours)[0];
  const best=[...options].filter(x=>x.profit!==null).sort((a,b)=>b.profit/b.hours-a.profit/a.hours)[0] || fastest;
  const profitable=[...options].filter(x=>x.profit!==null&&x.profit>0).sort((a,b)=>b.profit-a.profit)[0];
- results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(dxp.checked?'2× base XP scenario':'Base XP, no bonuses')+'</span></div><div class="plan-cards">'+card('⚡ FASTEST',fastest,'Prioritizes training speed, regardless of cost.')+card('⚖ BEST VALUE',best,'Balances training with estimated GP return per hour; later unlocks apply only to their eligible level ranges.')+(profitable?card('💰 PROFITABLE',profitable,'Positive estimated GP after the GE sale tax, subject to changing prices.'):'<article class="plan-card"><div class="plan-card-kicker">💰 PROFITABLE</div><h3>No confirmed profit method</h3><p>None of the modeled, unlocked recipes has a verified positive margin at the latest available prices. We will not invent a profitable option.</p></article>')+'</div>';
+ results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(dxp.checked?'2× base XP scenario':'Base XP, no bonuses')+'</span></div><div class="plan-cards">'+card('⚡ FASTEST',fastest,'Prioritizes training speed, regardless of cost.')+card('⚖ BEST VALUE',best,'Balances training with estimated GP return per hour; later unlocks apply only to their eligible level ranges.')+(profitable?card('💰 PROFITABLE',profitable,'Positive estimated GP after the GE sale tax, subject to changing prices.'):'<article class="plan-card"><div class="plan-card-kicker">💰 PROFITABLE</div><h3>No confirmed profit method</h3><p>None of the modeled, unlocked recipes has a verified positive margin at the latest available prices. We will not invent a profitable option.</p></article>')+'</div>'+buildRoadmap(from,to,xp,multiplier,'FASTEST')+buildRoadmap(from,to,xp,multiplier,'BEST VALUE / PROFIT') ;
  setStatus('Prices fetched automatically from RuneScape Wiki real-time GE trades. Prices are indicative, not guaranteed. Later unlocks cover only their eligible XP range; earlier levels still need training. Last fetched: '+new Date(priceUpdated).toLocaleTimeString()+'.');
 }
 document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch{setStatus('Live GE prices could not be loaded. Try again later. No unverified GP estimates will be displayed.');}});
