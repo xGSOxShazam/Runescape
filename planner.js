@@ -165,6 +165,6 @@ results.addEventListener('change',e=>{
  try{localStorage.setItem(progressKey,JSON.stringify(saved))}catch{}
  input.closest('.plan-stage')?.classList.toggle('stage-done',input.checked);
 });
-document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;lastPlan=null;results.innerHTML='';currentXp.value='';setStatus(activeSkill==='fletching'?'Enter your Fletching levels to compare complete routes.':'Verified route calculations are not yet available for '+e.detail.name+'.');});
+document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;lastPlan=null;results.innerHTML='';const selection=window.CODEX_PLAYER_SELECTION;if(selection&&selection.id===activeSkill){current.value=selection.level;goal.value=selection.goal;currentXp.value=selection.xp;}else{currentXp.value='';}setStatus(activeSkill==='fletching'?'Enter your Fletching levels to compare complete routes.':'Verified route calculations are not yet available for '+e.detail.name+'.');});
 document.getElementById('plan-refresh').addEventListener('click',()=>{priceMap=null;prices=null;document.getElementById('plan-form').requestSubmit();});
 })();
