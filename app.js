@@ -140,6 +140,7 @@
   });
   document.getElementById('back-top').addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
   document.addEventListener('keydown',event=>{if(event.key==='/'&&!dialog.open&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!document.activeElement.isContentEditable){event.preventDefault();search.focus();document.getElementById('library').scrollIntoView({behavior:'smooth'});}});
+  document.addEventListener('codex:player-plan',e=>{openSkill(e.detail.id,true);});
   window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#skill-'))openSkill(location.hash.slice(7),false);else if(dialog.open)closeSkill();});
   if('IntersectionObserver' in window){
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('is-visible');observer.unobserve(entry.target);}}),{threshold:.08});
