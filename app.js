@@ -49,6 +49,8 @@
   const search = document.getElementById('skill-search');
   const dialog = document.getElementById('skill-dialog');
   const colours = {Combat:'var(--combat)',Gathering:'var(--gathering)',Artisan:'var(--artisan)',Support:'var(--support)'};
+  const skillPalette = {"attack":"#d94d4d","strength":"#d86b32","defence":"#6395cf","ranged":"#5eaa58","magic":"#5488e8","necromancy":"#a36bea","constitution":"#d96079","prayer":"#e8d9a3","summoning":"#b9a0e8","archaeology":"#b78b5c","divination":"#66c8da","farming":"#76b64b","fishing":"#35b2d1","hunter":"#b8864c","mining":"#8ca8ba","woodcutting":"#4b9a61","smithing":"#c27c5b","cooking":"#e3a65d","crafting":"#c69bcd","firemaking":"#ee7138","fletching":"#77bba0","herblore":"#71c978","runecrafting":"#c59bdf","agility":"#9ac5e5","thieving":"#a47a8d","slayer":"#b45b5d","construction":"#d5a45b","dungeoneering":"#8d7eac","invention":"#e4c05b"};
+  const skillArt = (s) => `<img class="skill-official-icon" src="https://apps.runescape.com/runemetrics/images/skill-icons/${encodeURIComponent(s.id)}.png" alt="" loading="lazy" onerror="this.remove()" />`;
   const labels = {low:'ESSENTIAL LOADOUT',medium:'UPGRADED LOADOUT',high:'PREMIUM LOADOUT'};
   const gems = {low:'bronze',medium:'silver',high:'gold'};
   const descriptions = {
@@ -96,7 +98,7 @@
     document.getElementById('result-label').textContent=savedOnly?'saved skills':results.length===1?'skill to explore':'skills to explore';
     document.getElementById('empty-state').hidden=results.length!==0;
     document.getElementById('empty-message').textContent=savedOnly?'Save a skill with its bookmark button, or show all skills.':'Try another skill name, item or category.';
-    grid.innerHTML=results.map((s,index)=>`<article class="skill-card" style="--skill-color:${colours[s.category]};animation-delay:${Math.min(index,8)*24}ms"><div class="card-top"><div class="skill-emblem">${svg(s.icon)}</div><button class="save-button ${saved.has(s.id)?'saved':''}" data-save="${s.id}" aria-label="${saved.has(s.id)?'Unsave':'Save'} ${escape(s.name)}" aria-pressed="${saved.has(s.id)}">${svg('bookmark')}</button></div><p class="card-category">${escape(s.category==='Support'?'Support & elite':s.category)}</p><h3>${escape(s.name)}</h3><p class="card-summary">${escape(s.summary)}</p><span class="boost-pill">${svg('sparkles')}${escape(s.bonus)}</span><div class="card-loadout"><div class="loadout-label"><span class="tier-gem ${gems[tier]}"></span>${labels[tier]}</div><ul>${s.tiers[tier].map(item=>`<li>${escape(item)}</li>`).join('')}</ul></div><div class="card-bottom"><span>METHOD-SPECIFIC GUIDE</span><button class="card-open" data-open="${s.id}" aria-label="Read ${escape(s.name)} guide">Read guide ${svg('arrow-right')}</button></div></article>`).join('');
+    grid.innerHTML=results.map((s,index)=>`<article class="skill-card" style="--skill-color:${skillPalette[s.id] || colours[s.category]};animation-delay:${Math.min(index,8)*24}ms"><div class="card-top"><div class="skill-emblem">${svg(s.icon)}${skillArt(s)}</div><button class="save-button ${saved.has(s.id)?'saved':''}" data-save="${s.id}" aria-label="${saved.has(s.id)?'Unsave':'Save'} ${escape(s.name)}" aria-pressed="${saved.has(s.id)}">${svg('bookmark')}</button></div><p class="card-category">${escape(s.category==='Support'?'Support & elite':s.category)}</p><h3>${escape(s.name)}</h3><p class="card-summary">${escape(s.summary)}</p><span class="boost-pill">${svg('sparkles')}${escape(s.bonus)}</span><div class="card-loadout"><div class="loadout-label"><span class="tier-gem ${gems[tier]}"></span>${labels[tier]}</div><ul>${s.tiers[tier].map(item=>`<li>${escape(item)}</li>`).join('')}</ul></div><div class="card-bottom"><span>METHOD-SPECIFIC GUIDE</span><button class="card-open" data-open="${s.id}" aria-label="Read ${escape(s.name)} guide">Read guide ${svg('arrow-right')}</button></div></article>`).join('');
     document.querySelectorAll('[data-tier]').forEach(b=>{const selected=b.dataset.tier===tier;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
     document.querySelectorAll('[data-category]').forEach(b=>{const selected=b.dataset.category===category;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));});
     document.getElementById('tier-description').textContent=descriptions[tier];
@@ -109,7 +111,7 @@
     document.getElementById('dialog-category').textContent=`${skill.category==='Support'?'SUPPORT & ELITE':skill.category.toUpperCase()} / SKILL FIELD GUIDE`;
     document.getElementById('dialog-title').textContent=skill.name;
     document.getElementById('dialog-summary').textContent=skill.summary;
-    document.getElementById('dialog-icon').innerHTML=svg(skill.icon);
+    document.getElementById('dialog-icon').innerHTML=svg(skill.icon)+skillArt(skill);
     document.getElementById('dialog-content').innerHTML=skill.notes;
     updateSaved();
     if(!dialog.open)dialog.showModal();
