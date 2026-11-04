@@ -55,12 +55,26 @@ function compute(){
  if(!Number.isFinite(xp)||xp<xpAt(from)||xp>=xpAt(from+1)){setStatus('Current XP must fall within your selected current level. Clear the XP field to start at the beginning of the level.');results.innerHTML='';return;}
  const needed=Math.max(0,xpAt(to)-xp),multiplier=dxp.checked?2:1;
  const eligible=recipes.filter(r=>r.level<=from).map(r=>calculate(r,needed,multiplier));
+ // Workbench methods unlocked during the journey are calculated for their eligible XP segment.
+ function workbench(name,unlock,xpPerBow,seconds,finished){
+  if(to<=unlock)return null;
+  const stageXp=Math.max(0,xpAt(to)-Math.max(xp,xpAt(unlock)));
+  const count=Math.ceil(stageXp/(xpPerBow*multiplier)),logs=count*63;
+  const logCost=price('Eternal magic logs','buy'),bowCost=price(name,'buy'),sale=price(finished,'sell');
+  const missing=[logCost===null?'Eternal magic logs':null,bowCost===null?name:null,sale===null?finished:null].filter(Boolean);
+  const cost=logCost===null||bowCost===null?null:logs*logCost+count*bowCost;
+  return {name:finished+' (sell Mk. 5)',level:unlock,xp:xpPerBow,rate:3600/seconds,count,hours:count*seconds/3600,ingredients:[{name,qty:count},{name:'Eternal magic logs',qty:logs}],cost,profit:cost===null||sale===null?null:count*sale*.98-cost,missing,source:'https://runescape.wiki/w/Fletching',note:'Unlocks at level '+unlock+'. These quantities cover only the XP from level '+unlock+' onward; earlier levels need a separate method.'};
+ }
+ const options=[...eligible,
+  workbench('Eternal magic shortbow',100,52840,912,'Eternal magic shortbow Mk. 5'),
+  workbench('Primal crossbow',103,65235,1091.4,'Primal crossbow Mk. 5')
+ ].filter(Boolean);
  if(!eligible.length){setStatus('No verified Fletching recipes are available at this starting level.');results.innerHTML='';return;}
- const fastest=[...eligible].sort((a,b)=>a.hours-b.hours)[0];
- const best=[...eligible].sort((a,b)=>((a.profit===null?1e15:-a.profit)/Math.max(1,needed)) - ((b.profit===null?1e15:-b.profit)/Math.max(1,needed)) || a.hours-b.hours)[0];
- const profitable=[...eligible].filter(x=>x.profit!==null&&x.profit>0).sort((a,b)=>b.profit-a.profit)[0];
- results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(dxp.checked?'2× base XP scenario':'Base XP, no bonuses')+'</span></div><div class="plan-cards">'+card('⚡ FASTEST',fastest,'Prioritizes training speed, regardless of cost.')+card('⚖ BEST VALUE',best,'Lowest estimated GP cost per XP among the currently modeled methods. This may be slower.')+(profitable?card('💰 PROFITABLE',profitable,'Positive estimated GP after the GE sale tax, subject to changing prices.'):'<article class="plan-card"><div class="plan-card-kicker">💰 PROFITABLE</div><h3>No confirmed profit method</h3><p>None of the modeled, unlocked recipes has a verified positive margin at the latest available prices. We will not invent a profitable option.</p></article>')+'</div>';
- setStatus('Prices fetched automatically from RuneScape Wiki real-time GE trades. Prices are indicative, not guaranteed. Only methods unlocked at your starting level are compared. Last fetched: '+new Date(priceUpdated).toLocaleTimeString()+'.');
+ const fastest=[...options].sort((a,b)=>a.hours-b.hours)[0];
+ const best=[...options].filter(x=>x.profit!==null).sort((a,b)=>b.profit/b.hours-a.profit/a.hours)[0] || fastest;
+ const profitable=[...options].filter(x=>x.profit!==null&&x.profit>0).sort((a,b)=>b.profit-a.profit)[0];
+ results.innerHTML='<div class="plan-summary"><strong>'+nf.format(needed)+' XP remaining</strong><span>Level '+from+' → '+to+' · '+(dxp.checked?'2× base XP scenario':'Base XP, no bonuses')+'</span></div><div class="plan-cards">'+card('⚡ FASTEST',fastest,'Prioritizes training speed, regardless of cost.')+card('⚖ BEST VALUE',best,'Balances training with estimated GP return per hour; later unlocks apply only to their eligible level ranges.')+(profitable?card('💰 PROFITABLE',profitable,'Positive estimated GP after the GE sale tax, subject to changing prices.'):'<article class="plan-card"><div class="plan-card-kicker">💰 PROFITABLE</div><h3>No confirmed profit method</h3><p>None of the modeled, unlocked recipes has a verified positive margin at the latest available prices. We will not invent a profitable option.</p></article>')+'</div>';
+ setStatus('Prices fetched automatically from RuneScape Wiki real-time GE trades. Prices are indicative, not guaranteed. Later unlocks cover only their eligible XP range; earlier levels still need training. Last fetched: '+new Date(priceUpdated).toLocaleTimeString()+'.');
 }
 document.getElementById('plan-form').addEventListener('submit',async e=>{e.preventDefault();results.innerHTML='';setStatus('Checking Grand Exchange prices…');try{await loadPrices();compute();}catch{setStatus('Live GE prices could not be loaded. Try again later. No unverified GP estimates will be displayed.');}});
 document.addEventListener('codex:skill-open',e=>{activeSkill=e.detail.id;results.innerHTML='';currentXp.value='';setStatus(activeSkill==='fletching'?'Enter your Fletching levels, then calculate all three plans.':'Training calculations for '+e.detail.name+' are being researched. This skill’s equipment guide remains available below.');});
